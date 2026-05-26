@@ -16,6 +16,10 @@ connection.connect((error)=>{
     console.log("Database connected")
 })
 
-app.listen(5000,()=>{
+app.get("/",(req,res)=>{
+    res.send("Backend Running Successfully")
+})
+
+app.listen(5000,"0.0.0.0",()=>{
     console.log("server is running")
 })
