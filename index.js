@@ -1,10 +1,11 @@
+require("dotenv").config()
 const mysql=require("mysql2")
 const express=require("express")
 const connection=mysql.createConnection({
-    host:"database-3.chgcec6outqy.us-east-2.rds.amazonaws.com",
-    user:"admin",
-    database:"mysql",
-    password:"TONYislive01"
+    host:process.env.DB_HOST,
+    user:process.env.DB_USER,
+    database:process.env.DB_NAME,
+    password:process.env.DB_PASSWORD
 })
 
 const app=express()
