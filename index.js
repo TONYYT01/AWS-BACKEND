@@ -17,7 +17,9 @@ connection.connect((error)=>{
 })
 
 app.get("/",(req,res)=>{
-    res.send("Backend Running Successfully")
+    res.json({
+    message: "Backend Running Successfully",
+  });
 })
 
 app.listen(5000,"0.0.0.0",()=>{
