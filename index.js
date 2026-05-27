@@ -22,6 +22,15 @@ app.get("/",(req,res)=>{
   });
 })
 
+app.get("/databases",(req,res)=>{
+    connection.query("Show databases",(error,result)=>{
+        if (error){
+            return res.status(404).json("Error we are getting")
+        }
+        res.status(200).json(result)
+    })
+})
+
 app.listen(5000,"0.0.0.0",()=>{
     console.log("server is running")
 })
