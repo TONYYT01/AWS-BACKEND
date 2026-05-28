@@ -22,7 +22,7 @@ connection.connect((error) => {
   console.log("Database connected");
 });
 
-app.get("/databases", (req, res) => {
+app.get("/api/databases", (req, res) => {
   connection.query("SHOW DATABASES", (error, result) => {
     if (error) {
       return res.status(500).json({
