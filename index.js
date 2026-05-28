@@ -22,8 +22,8 @@ connection.connect((error) => {
   console.log("Database connected");
 });
 
-app.get("/api/databases", (req, res) => {
-  connection.query("SHOW DATABASES", (error, result) => {
+app.get("/api/tables", (req, res) => {
+  connection.query("SHOW tables", (error, result) => {
     if (error) {
       return res.status(500).json({
         message: "Error while fetching databases",
