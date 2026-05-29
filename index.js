@@ -66,7 +66,7 @@ app.get("/api/tables", (req, res) => {
 });
 /* ================= SIGNUP ================= */
 
-app.post("/signup", async (req, res) => {
+app.post("/api/signup", async (req, res) => {
 
   try {
 
@@ -228,7 +228,7 @@ app.post("/signup", async (req, res) => {
 
 /* ================= LOGIN ================= */
 
-app.post("/login", (req, res) => {
+app.post("/api/login", (req, res) => {
   try {
     const { email, password, user_type } = req.body;
 
@@ -298,7 +298,7 @@ app.post("/login", (req, res) => {
 
 /* ================= GET USER DETAILS ================= */
 
-app.post("/get-user", (req, res) => {
+app.post("/api/get-user", (req, res) => {
 
   const { email } = req.body;
 
@@ -340,11 +340,11 @@ app.post("/get-user", (req, res) => {
   );
 });
 
-/* ================= UPDATE PROFILE ================= */ app.put("/update-profile", (req, res) => { const { email, first_name, last_name, phone, } = req.body; const query = ` UPDATE users SET first_name = ?, last_name = ?, phone = ? WHERE email = ? `; connection.query( query, [ first_name, last_name, phone, email, ], (err) => { if (err) { console.log(err); return res.json({ status: "update_failed", }); } const getUpdatedUser = ` SELECT id, username, first_name, last_name, phone, email, user_type FROM users WHERE email = ? `; connection.query( getUpdatedUser, [email], (err, result) => { if (err) { return res.json({ status: "db_error", }); } res.json({ status: "updated_successfully", user: result[0], }); } ); } ); });
+/* ================= UPDATE PROFILE ================= */ app.put("/api/update-profile", (req, res) => { const { email, first_name, last_name, phone, } = req.body; const query = ` UPDATE users SET first_name = ?, last_name = ?, phone = ? WHERE email = ? `; connection.query( query, [ first_name, last_name, phone, email, ], (err) => { if (err) { console.log(err); return res.json({ status: "update_failed", }); } const getUpdatedUser = ` SELECT id, username, first_name, last_name, phone, email, user_type FROM users WHERE email = ? `; connection.query( getUpdatedUser, [email], (err, result) => { if (err) { return res.json({ status: "db_error", }); } res.json({ status: "updated_successfully", user: result[0], }); } ); } ); });
 
 
 
-app.post("/verify-otp", (req, res) => {
+app.post("/api/verify-otp", (req, res) => {
 
   const { email, otp } = req.body;
 
