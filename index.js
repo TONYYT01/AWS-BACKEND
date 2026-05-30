@@ -720,6 +720,101 @@ app.post("/api/verify-donate-otp", (req, res) => {
     }
   );
 });
+
+app.post("/api/resend-donate-otp", async (req, res) => {
+  try {
+
+    const { donation_id } = req.body;
+
+    connection.query(
+      "SELECT * FROM donations WHERE id = ?",
+      [donation_id],
+      async (err, result) => {
+
+        if (err) {
+          return res.json({
+            status: "db_error"
+          });
+        }
+
+        if (result.length === 0) {
+          return res.json({
+            status: "not_found"
+          });
+        }
+
+        const donation = result[0];
+
+        const otp = Math.floor(
+          100000 + Math.random() * 900000
+        ).toString();
+
+        const otp_expiry = new Date(
+          Date.now() + 10 * 60 * 1000
+        );
+
+        connection.query(
+          `
+          UPDATE donations
+          SET
+            otp = ?,
+            otp_expiry = ?
+          WHERE id = ?
+          `,
+          [
+            otp,
+            otp_expiry,
+            donation_id
+          ],
+          async (err) => {
+
+            if (err) {
+              return res.json({
+                status: "db_error"
+              });
+            }
+
+            try {
+
+              await transporter.sendMail({
+                from: process.env.EMAIL_USER,
+                to: donation.donor_email,
+                subject: "Donation OTP",
+                html: `
+                  <h2>Your Donation OTP</h2>
+                  <h1>${otp}</h1>
+                  <p>Valid for 10 minutes.</p>
+                `
+              });
+
+              res.json({
+                status: "otp_resent"
+              });
+
+            } catch (mailError) {
+
+              console.log(mailError);
+
+              res.json({
+                status: "mail_error"
+              });
+            }
+          }
+        );
+      }
+    );
+
+  } catch (error) {
+
+    console.log(error);
+
+    res.json({
+      status: "server_error"
+    });
+
+  }
+});
+
 app.post("/api/my-requests", (req, res) => {
 
   const { email } = req.body;
