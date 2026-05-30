@@ -484,6 +484,373 @@ app.put("/api/update-profile", (req, res) => {
   }
 });
 
+app.post("/api/donate", async (req, res) => {
+  try {
+
+    const {
+      donor_name,
+      donor_email,
+      donor_phone,
+      item_type,
+      item_name,
+      quantity,
+      pickup_location,
+      remarks
+    } = req.body;
+
+    const otp = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+    const otp_expiry = new Date(
+      Date.now() + 10 * 60 * 1000
+    );
+
+    const query = `
+      INSERT INTO donations
+      (
+        donor_name,
+        donor_email,
+        donor_phone,
+        item_type,
+        food_type,
+        quantity,
+        pickup_address,
+        otp,
+        otp_expiry,
+        is_verified,
+        donation_status,
+        notes
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    connection.query(
+      query,
+      [
+        donor_name,
+        donor_email,
+        donor_phone || null,
+
+        item_type,      // food/clothes/other
+
+        item_name,      // biryani/shirts/books
+
+        quantity,
+
+        pickup_location,
+
+        otp,
+        otp_expiry,
+
+        0,
+
+        "pending",
+
+        remarks || null
+      ],
+      async (err, result) => {
+
+        if (err) {
+          console.log(err);
+          return res.json({
+            status: "db_error"
+          });
+        }
+
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: donor_email,
+          subject: "Donation OTP",
+          html: `<h1>${otp}</h1>`
+        });
+
+        res.json({
+          status: "otp_sent",
+          donation_id: result.insertId
+        });
+
+      }
+    );
+
+  } catch (error) {
+
+    console.log(error);
+
+    res.json({
+      status: "server_error"
+    });
+
+  }
+});
+
+app.post("/api/donate", async (req, res) => {
+  try {
+
+    const {
+      donor_name,
+      donor_email,
+      donor_phone,
+      item_type,
+      item_name,
+      quantity,
+      pickup_location,
+      drop_location,
+      remarks
+    } = req.body;
+
+    const otp = Math.floor(
+      100000 + Math.random() * 900000
+    ).toString();
+
+    const otp_expiry = new Date(
+      Date.now() + 10 * 60 * 1000
+    );
+
+    const query = `
+      INSERT INTO donations
+      (
+        donor_name,
+        donor_email,
+        donor_phone,
+        item_type,
+        food_type,
+        quantity,
+        pickup_address,
+        drop_address,
+        otp,
+        otp_expiry,
+        is_verified,
+        donation_status,
+        notes
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    connection.query(
+      query,
+      [
+        donor_name,
+        donor_email,
+        donor_phone,
+        item_type,
+        item_name,
+        quantity,
+        pickup_location,
+        drop_location,
+        otp,
+        otp_expiry,
+        0,
+        "not_picked",
+        remarks || null
+      ],
+      async (err, result) => {
+
+        if (err) {
+          console.log(err);
+          return res.json({ status: "db_error" });
+        }
+
+        await transporter.sendMail({
+          from: process.env.EMAIL_USER,
+          to: donor_email,
+          subject: "Donation OTP Verification",
+          html: `<h1>${otp}</h1>`
+        });
+
+        res.json({
+          status: "otp_sent",
+          donation_id: result.insertId
+        });
+      }
+    );
+
+  } catch (error) {
+    console.log(error);
+    res.json({ status: "server_error" });
+  }
+});
+
+app.post("/api/verify-donate-otp", (req, res) => {
+
+  const { donation_id, otp } = req.body;
+
+  connection.query(
+    "SELECT * FROM donations WHERE id = ?",
+    [donation_id],
+    (err, result) => {
+
+      if (err)
+        return res.json({ status: "db_error" });
+
+      if (result.length === 0)
+        return res.json({ status: "not_found" });
+
+      const donation = result[0];
+
+      if (donation.otp !== otp)
+        return res.json({ status: "invalid_otp" });
+
+      connection.query(
+        `
+        UPDATE donations
+        SET
+          is_verified = 1,
+          otp = NULL,
+          otp_expiry = NULL
+        WHERE id = ?
+        `,
+        [donation_id],
+        (err) => {
+
+          if (err)
+            return res.json({ status: "db_error" });
+
+          res.json({
+            status: "donation_verified"
+          });
+        }
+      );
+    }
+  );
+});
+
+app.post("/api/my-requests", (req, res) => {
+
+  const { email } = req.body;
+
+  connection.query(
+    `
+    SELECT
+      id,
+      item_type,
+      food_type AS item_name,
+      quantity,
+      pickup_address AS pickup_location,
+      donation_status,
+      is_verified,
+      created_at
+    FROM donations
+    WHERE donor_email = ?
+    ORDER BY created_at DESC
+    `,
+    [email],
+    (err, result) => {
+
+      if (err)
+        return res.json({ status: "db_error" });
+
+      res.json({
+        status: "success",
+        requests: result
+      });
+    }
+  );
+});
+app.post("/api/rider/mark-delivered", (req, res) => {
+
+  const { donation_id } = req.body;
+
+  connection.query(
+    `
+    UPDATE donations
+    SET
+      donation_status = 'delivered',
+      delivered_time = NOW()
+    WHERE id = ?
+    `,
+    [donation_id],
+    (err) => {
+
+      if (err)
+        return res.json({ status: "db_error" });
+
+      res.json({
+        status: "delivered_success"
+      });
+    }
+  );
+});
+app.post("/api/rider/my-rides", (req, res) => {
+
+  const { rider_email } = req.body;
+
+  connection.query(
+    `
+    SELECT *
+    FROM donations
+    WHERE rider_email = ?
+    ORDER BY created_at DESC
+    `,
+    [rider_email],
+    (err, result) => {
+
+      if (err)
+        return res.json({ status: "db_error" });
+
+      res.json({
+        status: "success",
+        rides: result
+      });
+    }
+  );
+});
+
+app.post("/api/rider/pickup", (req, res) => {
+
+  const {
+    donation_id,
+    rider_email,
+    rider_phone
+  } = req.body;
+
+  connection.query(
+    `
+    UPDATE donations
+    SET
+      rider_email = ?,
+      rider_phone = ?,
+      donation_status = 'picked',
+      pickup_time = NOW()
+    WHERE id = ?
+    `,
+    [
+      rider_email,
+      rider_phone,
+      donation_id
+    ],
+    (err) => {
+
+      if (err)
+        return res.json({ status: "db_error" });
+
+      res.json({
+        status: "pickup_locked"
+      });
+    }
+  );
+});
+app.post("/api/rider/available-pickups", (req, res) => {
+
+  connection.query(
+    `
+    SELECT *
+    FROM donations
+    WHERE donation_status = 'not_picked'
+    AND is_verified = 1
+    `,
+    (err, result) => {
+
+      if (err)
+        return res.json({ status: "db_error" });
+
+      res.json({
+        status: "success",
+        donations: result
+      });
+    }
+  );
+});
 /* ================= SERVER ================= */
 
 app.listen(5000, "0.0.0.0", () => {
