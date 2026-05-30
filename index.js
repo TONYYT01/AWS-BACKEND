@@ -934,36 +934,41 @@ app.post("/api/rider/pickup", (req, res) => {
 });
 app.post("/api/rider/available-pickups", (req, res) => {
 
-  connection.query(
-    `
+  const query = `
     SELECT
       id,
+      donor_name,
+      donor_email,
+      donor_phone,
       item_type,
-      food_type AS item_name,
+      food_type,
       quantity,
-      pickup_address AS pickup_location,
+      pickup_address,
+      drop_address,
+      notes,
       donation_status,
       created_at
     FROM donations
-    WHERE is_verified = 1
-    AND donation_status = 'pending'
+    WHERE donation_status = 'pending'
     ORDER BY created_at DESC
-    `,
-    (err, result) => {
+  `;
 
-      if (err) {
-        console.log(err);
-        return res.json({
-          status: "db_error"
-        });
-      }
+  connection.query(query, (err, result) => {
 
-      res.json({
-        status: "success",
-        donations: result
+    if (err) {
+      console.log(err);
+
+      return res.json({
+        status: "db_error"
       });
     }
-  );
+
+    res.json({
+      status: "success",
+      donations: result
+    });
+
+  });
 
 });
 /* ================= SERVER ================= */
