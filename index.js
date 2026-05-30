@@ -421,6 +421,68 @@ app.post("/api/verify-otp", (req, res) => {
   );
 });
 
+app.put("/api/update-profile", (req, res) => {
+  try {
+    const { email, first_name, last_name, phone } = req.body;
+
+    if (!email) {
+      return res.json({
+        status: "email_required"
+      });
+    }
+
+    const query = `
+      UPDATE users
+      SET first_name = ?, last_name = ?, phone = ?
+      WHERE email = ?
+    `;
+
+    connection.query(
+      query,
+      [first_name, last_name, phone, email],
+      (err, result) => {
+
+        if (err) {
+          console.log(err);
+          return res.json({
+            status: "db_error"
+          });
+        }
+
+        if (result.affectedRows === 0) {
+          return res.json({
+            status: "user_not_found"
+          });
+        }
+
+        connection.query(
+          "SELECT id, username, first_name, last_name, email, phone, user_type FROM users WHERE email = ?",
+          [email],
+          (err, userResult) => {
+
+            if (err) {
+              return res.json({
+                status: "db_error"
+              });
+            }
+
+            return res.json({
+              status: "updated_successfully",
+              user: userResult[0]
+            });
+          }
+        );
+      }
+    );
+
+  } catch (error) {
+    console.log(error);
+
+    res.json({
+      status: "server_error"
+    });
+  }
+});
 
 /* ================= SERVER ================= */
 
