@@ -680,41 +680,46 @@ app.post("/api/verify-donate-otp", (req, res) => {
     [donation_id],
     (err, result) => {
 
-      if (err)
-        return res.json({ status: "db_error" });
-
-      if (result.length === 0)
-        return res.json({ status: "not_found" });
+      if (result.length === 0) {
+        return res.json({
+          status: "not_found"
+        });
+      }
 
       const donation = result[0];
 
-      if (donation.otp !== otp)
-        return res.json({ status: "invalid_otp" });
+      if (donation.otp !== otp) {
+        return res.json({
+          status: "invalid_otp"
+        });
+      }
 
       connection.query(
         `
         UPDATE donations
         SET
           is_verified = 1,
-          otp = NULL,
-          otp_expiry = NULL
+          donation_status = 'picked',
+          pickup_time = NOW()
         WHERE id = ?
         `,
         [donation_id],
         (err) => {
 
-          if (err)
-            return res.json({ status: "db_error" });
+          if (err) {
+            return res.json({
+              status: "db_error"
+            });
+          }
 
           res.json({
-            status: "donation_verified"
+            status: "pickup_verified"
           });
         }
       );
     }
   );
 });
-
 app.post("/api/my-requests", (req, res) => {
 
   const { email } = req.body;
@@ -796,6 +801,8 @@ app.post("/api/rider/my-rides", (req, res) => {
   );
 });
 
+
+
 app.post("/api/rider/pickup", (req, res) => {
 
   const {
@@ -834,15 +841,27 @@ app.post("/api/rider/available-pickups", (req, res) => {
 
   connection.query(
     `
-    SELECT *
+    SELECT
+      id,
+      item_type,
+      food_type AS item_name,
+      quantity,
+      pickup_address AS pickup_location,
+      donation_status,
+      created_at
     FROM donations
-    WHERE donation_status = 'not_picked'
-    AND is_verified = 1
+    WHERE is_verified = 1
+    AND donation_status = 'pending'
+    ORDER BY created_at DESC
     `,
     (err, result) => {
 
-      if (err)
-        return res.json({ status: "db_error" });
+      if (err) {
+        console.log(err);
+        return res.json({
+          status: "db_error"
+        });
+      }
 
       res.json({
         status: "success",
@@ -850,6 +869,7 @@ app.post("/api/rider/available-pickups", (req, res) => {
       });
     }
   );
+
 });
 /* ================= SERVER ================= */
 
