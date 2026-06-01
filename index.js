@@ -1,17 +1,91 @@
-
 require("dotenv").config();
 
-const mysql = require("mysql2");
 const express = require("express");
+const mysql = require("mysql2");
 const cors = require("cors");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+/* ================= APP ================= */
+
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+
+/* ================= STATIC FILES ================= */
+
+app.use("/uploads", express.static("uploads"));
+
+/* ================= MULTER CONFIG ================= */
+
+const storage = multer.diskStorage({
+
+  destination: (req, file, cb) => {
+    cb(null, "uploads/profiles");
+  },
+
+  filename: (req, file, cb) => {
+
+    const email = req.body.email;
+
+    const ext = path.extname(
+      file.originalname
+    );
+
+    cb(
+      null,
+      `${email}${ext}`
+    );
+
+  }
+
+});
+
+const upload = multer({
+
+  storage,
+
+  limits: {
+    fileSize: 5 * 1024 * 1024
+  },
+
+  fileFilter: (req, file, cb) => {
+
+    const allowed = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png"
+    ];
+
+    if (
+      allowed.includes(
+        file.mimetype
+      )
+    ) {
+
+      cb(null, true);
+
+    } else {
+
+      cb(
+        new Error(
+          "Only JPG and PNG allowed"
+        )
+      );
+
+    }
+
+  }
+
+});
+
+
 
 /* ================= DATABASE ================= */
 
@@ -66,164 +140,196 @@ app.get("/api/tables", (req, res) => {
 });
 /* ================= SIGNUP ================= */
 
-app.post("/api/signup", async (req, res) => {
+app.post(
+  "/api/signup",
+  upload.single("profile_photo"),
+  async (req, res) => {
 
-  try {
+    try {
 
-    const {
-      username,
-      first_name,
-      last_name,
-      phone,
-      email,
-      password,
-      user_type,
-    } = req.body;
+      const {
+        username,
+        first_name,
+        last_name,
+        phone,
+        email,
+        password,
+        user_type
+      } = req.body;
 
-    /* ================= CHECK USER ================= */
+      const profile_photo = req.file
+        ? `uploads/profiles/${req.file.filename}`
+        : null;
 
-    const checkQuery =
-      "SELECT * FROM users WHERE email = ?";
+      /* ================= CHECK USER ================= */
 
-    connection.query(
-      checkQuery,
-      [email],
-      async (err, result) => {
+      const checkQuery =
+        "SELECT * FROM users WHERE email = ?";
 
-        if (err) {
+      connection.query(
+        checkQuery,
+        [email],
+        async (err, result) => {
 
-          return res.json({
-            status: "db_error",
-          });
+          if (err) {
 
-        }
+            console.log(err);
 
-        if (result.length > 0) {
-
-          return res.json({
-            status: "user_exists",
-          });
-
-        }
-
-        /* ================= GENERATE OTP ================= */
-
-        const otp =
-          Math.floor(
-            100000 + Math.random() * 900000
-          );
-
-        const otpExpiry =
-          new Date(
-            Date.now() + 5 * 60 * 1000
-          );
-
-        /* ================= HASH PASSWORD ================= */
-
-        const hashedPassword =
-          await bcrypt.hash(password, 10);
-
-        /* ================= INSERT USER ================= */
-
-        const insertQuery = `
-          INSERT INTO users
-          (
-            username,
-            first_name,
-            last_name,
-            phone,
-            email,
-            password,
-            user_type,
-            otp,
-            otp_expiry,
-            is_verified
-          )
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-
-        connection.query(
-          insertQuery,
-          [
-            username,
-            first_name,
-            last_name,
-            phone,
-            email,
-            hashedPassword,
-            user_type,
-            otp,
-            otpExpiry,
-            0
-          ],
-          async (err) => {
-
-            if (err) {
-
-              console.log(err);
-
-              return res.json({
-                status: "signup_failed",
-              });
-
-            }
-
-            /* ================= SEND OTP MAIL ================= */
-
-            await transporter.sendMail({
-              from: process.env.EMAIL_USER,
-              to: email,
-              subject: "DWJD OTP Verification",
-              html: `
-                <div style="
-                  font-family: Arial;
-                  padding: 20px;
-                  background: #f4f4f4;
-                ">
-                  <h2>
-                    Welcome to DWJD 🌱
-                  </h2>
-
-                  <p>
-                    Your OTP verification code is:
-                  </p>
-
-                  <h1 style="
-                    color: green;
-                    letter-spacing: 5px;
-                  ">
-                    ${otp}
-                  </h1>
-
-                  <p>
-                    OTP expires in 5 minutes.
-                  </p>
-                </div>
-              `,
-            });
-
-            /* ================= RESPONSE ================= */
-
-            res.json({
-              status: "signup_success_otp_sent",
+            return res.json({
+              status: "db_error"
             });
 
           }
-        );
-      }
-    );
 
-  } catch (error) {
+          if (result.length > 0) {
 
-    console.log(error);
+            return res.json({
+              status: "user_exists"
+            });
 
-    res.json({
-      status: "server_error",
-    });
+          }
+
+          /* ================= OTP ================= */
+
+          const otp =
+            Math.floor(
+              100000 + Math.random() * 900000
+            ).toString();
+
+          const otpExpiry =
+            new Date(
+              Date.now() + 5 * 60 * 1000
+            );
+
+          /* ================= HASH PASSWORD ================= */
+
+          const hashedPassword =
+            await bcrypt.hash(password, 10);
+
+          /* ================= INSERT USER ================= */
+
+          const insertQuery = `
+            INSERT INTO users
+            (
+              username,
+              first_name,
+              last_name,
+              phone,
+              email,
+              password,
+              user_type,
+              otp,
+              otp_expiry,
+              is_verified,
+              profile_photo
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+
+          connection.query(
+            insertQuery,
+            [
+              username,
+              first_name,
+              last_name,
+              phone,
+              email,
+              hashedPassword,
+              user_type,
+              otp,
+              otpExpiry,
+              0,
+              profile_photo
+            ],
+            async (err) => {
+
+              if (err) {
+
+                console.log(err);
+
+                return res.json({
+                  status: "signup_failed"
+                });
+
+              }
+
+              try {
+
+                /* ================= SEND OTP ================= */
+
+                await transporter.sendMail({
+
+                  from:
+                    process.env.EMAIL_USER,
+
+                  to: email,
+
+                  subject:
+                    "DWJD OTP Verification",
+
+                  html: `
+                    <div style="
+                      font-family: Arial;
+                      padding: 20px;
+                      background: #f4f4f4;
+                    ">
+
+                      <h2>
+                        Welcome to DWJD 🌱
+                      </h2>
+
+                      <p>
+                        Your OTP verification code:
+                      </p>
+
+                      <h1 style="
+                        color: green;
+                        letter-spacing: 5px;
+                      ">
+                        ${otp}
+                      </h1>
+
+                      <p>
+                        OTP expires in 5 minutes.
+                      </p>
+
+                    </div>
+                  `
+                });
+
+                return res.json({
+                  status:
+                    "signup_success_otp_sent"
+                });
+
+              } catch (mailError) {
+
+                console.log(mailError);
+
+                return res.json({
+                  status: "mail_error"
+                });
+
+              }
+
+            }
+          );
+
+        }
+      );
+
+    } catch (error) {
+
+      console.log(error);
+
+      res.json({
+        status: "server_error"
+      });
+
+    }
 
   }
-});
-
+);
 
 
 /* ================= LOGIN ================= */
