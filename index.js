@@ -416,7 +416,8 @@ app.post("/api/get-user", (req, res) => {
       last_name,
       phone,
       email,
-      user_type
+      user_type,
+      profile_photo
     FROM users
     WHERE email = ?
   `;
@@ -437,7 +438,6 @@ app.post("/api/get-user", (req, res) => {
           status: "user_not_found",
         });
       }
-
       res.json({
         status: "success",
         user: result[0],
@@ -446,8 +446,93 @@ app.post("/api/get-user", (req, res) => {
   );
 });
 
-/* ================= UPDATE PROFILE ================= */ app.put("/api/update-profile", (req, res) => { const { email, first_name, last_name, phone, } = req.body; const query = ` UPDATE users SET first_name = ?, last_name = ?, phone = ? WHERE email = ? `; connection.query( query, [ first_name, last_name, phone, email, ], (err) => { if (err) { console.log(err); return res.json({ status: "update_failed", }); } const getUpdatedUser = ` SELECT id, username, first_name, last_name, phone, email, user_type FROM users WHERE email = ? `; connection.query( getUpdatedUser, [email], (err, result) => { if (err) { return res.json({ status: "db_error", }); } res.json({ status: "updated_successfully", user: result[0], }); } ); } ); });
+app.put(
+  "/api/update-profile",
+  upload.single("profile_photo"),
+  (req, res) => {
 
+    const {
+      email,
+      first_name,
+      last_name,
+      phone
+    } = req.body;
+
+    const profile_photo = req.file
+      ? `uploads/profiles/${req.file.filename}`
+      : null;
+
+    const query = `
+      UPDATE users
+      SET
+        first_name = ?,
+        last_name = ?,
+        phone = ?,
+        profile_photo = COALESCE(?, profile_photo)
+      WHERE email = ?
+    `;
+
+    connection.query(
+      query,
+      [
+        first_name,
+        last_name,
+        phone,
+        profile_photo,
+        email
+      ],
+      (err) => {
+
+        if (err) {
+
+          console.log(err);
+
+          return res.json({
+            status: "update_failed"
+          });
+
+        }
+
+        const getUpdatedUser = `
+          SELECT
+            id,
+            username,
+            first_name,
+            last_name,
+            phone,
+            email,
+            user_type,
+            profile_photo
+          FROM users
+          WHERE email = ?
+        `;
+
+        connection.query(
+          getUpdatedUser,
+          [email],
+          (err, result) => {
+
+            if (err) {
+
+              return res.json({
+                status: "db_error"
+              });
+
+            }
+
+            res.json({
+              status: "updated_successfully",
+              user: result[0]
+            });
+
+          }
+        );
+
+      }
+    );
+
+  }
+);
 
 
 app.post("/api/verify-otp", (req, res) => {
